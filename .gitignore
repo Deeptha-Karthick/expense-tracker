@@ -1,0 +1,9 @@
+.env*
+!.env.example
+node_modules
+.next
+coverage
+CLAUDE.local.md
+# typescript
+*.tsbuildinfo
+next-env.d.ts
