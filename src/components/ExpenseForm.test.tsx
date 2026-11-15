@@ -169,6 +169,17 @@ describe("ExpenseForm", () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ amountPaise: 10000000 }));
   });
 
+  it("cannot be saved with the previous category while a new category is being created", async () => {
+    const { user, onSubmit } = setup();
+
+    await fillRequired(user); // category: Dine out
+    await user.selectOptions(screen.getByLabelText(/^Category/), "+ New category");
+    await user.click(submit());
+
+    expect(screen.getByLabelText(/^Category/)).toHaveAccessibleDescription("Choose a category");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("creates a new category inline and submits the expense with it", async () => {
     const { user, onSubmit, onCreateCategory } = setup();
 

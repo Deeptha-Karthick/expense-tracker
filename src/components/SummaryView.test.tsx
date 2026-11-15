@@ -1,9 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SummaryView } from "@/components/SummaryView";
 import { fetchSummary } from "@/lib/api-client";
-import { presetRange } from "@/lib/date-presets";
-import { todayInKolkata } from "@/lib/dates";
 import { SUMMARY } from "@/test/fixtures";
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
@@ -33,11 +31,19 @@ describe("SummaryView", () => {
     );
   });
 
-  it("refetches for the chosen range", async () => {
+  it("shows the results for the chosen range in place of the old ones", async () => {
     const user = userEvent.setup();
-    mockFetch.mockResolvedValue(SUMMARY);
+    const lastMonth = {
+      range: { from: "2026-05-01", to: "2026-05-31" },
+      totalPaise: 50000,
+      byCategory: [
+        { categoryId: 13, name: "Pets", totalPaise: 50000, count: 1, percentage: 100 },
+      ],
+    };
+    mockFetch.mockResolvedValueOnce(SUMMARY).mockResolvedValueOnce(lastMonth);
     render(<SummaryView />);
-    await screen.findByRole("table");
+    const table = await screen.findByRole("table");
+    expect(within(table).getByText("Groceries")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Last month" }));
 
@@ -45,9 +51,11 @@ describe("SummaryView", () => {
       "aria-pressed",
       "true",
     );
-    expect(await screen.findByRole("table")).toBeInTheDocument();
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(mockFetch.mock.calls[1][0]).toEqual(presetRange("lastMonth", todayInKolkata()));
+    expect(await screen.findByText("Showing 1 May 2026 – 31 May 2026")).toBeInTheDocument();
+    const updated = screen.getByRole("table");
+    expect(within(updated).getByRole("row", { name: /Pets/ })).toHaveTextContent("₹500.00");
+    expect(within(updated).queryByText("Groceries")).not.toBeInTheDocument();
+    expect(screen.queryByText("Showing 1 Jun 2026 – 30 Jun 2026")).not.toBeInTheDocument();
   });
 
   it("shows an empty state when there is no spending", async () => {

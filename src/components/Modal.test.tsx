@@ -85,6 +85,23 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("does not close when a press starts inside the panel and ends on the backdrop", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal title="Details" onClose={onClose}>
+        <p>Body</p>
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog");
+
+    // Dragging a text selection out of the panel: mousedown inside, mouseup and click outside.
+    fireEvent.mouseDown(screen.getByText("Body"));
+    fireEvent.mouseUp(dialog);
+    fireEvent.click(dialog);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("closes with the Close button", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

@@ -40,8 +40,9 @@ export function Modal({ title, onClose, children }: Props) {
     onClose();
   }
 
-  function handleBackdropClick(event: React.MouseEvent<HTMLDialogElement>) {
-    // Only a click on the <dialog> itself (the backdrop area) closes it.
+  function handleBackdropMouseDown(event: React.MouseEvent<HTMLDialogElement>) {
+    // Only a press that starts on the <dialog> itself (the backdrop area) closes it, so
+    // dragging a text selection from the panel out past its edge does not dismiss it.
     if (event.target === event.currentTarget) onClose();
   }
 
@@ -57,7 +58,7 @@ export function Modal({ title, onClose, children }: Props) {
       aria-modal="true"
       aria-labelledby={titleId}
       onKeyDown={handleKeyDown}
-      onClick={handleBackdropClick}
+      onMouseDown={handleBackdropMouseDown}
       onCancel={handleCancel}
       className="m-auto w-full max-w-lg rounded-xl bg-background p-0 text-foreground shadow-xl backdrop:bg-black/50"
     >

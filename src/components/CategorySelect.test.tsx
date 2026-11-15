@@ -1,7 +1,18 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CategorySelect } from "@/components/CategorySelect";
+import type { CategoryDTO } from "@/lib/api-client";
 import { CATEGORIES, makeCategory } from "@/test/fixtures";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function setup(props: Partial<React.ComponentProps<typeof CategorySelect>> = {}) {
   const onChange = vi.fn();
@@ -91,7 +102,8 @@ describe("CategorySelect", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Category already exists");
     expect(screen.getByLabelText("New category name")).toBeInTheDocument();
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledTimes(1); // only the clear when the form opened
+    expect(onChange).toHaveBeenCalledWith("");
   });
 
   it("uses a generic message when the API gives none", async () => {
@@ -136,7 +148,16 @@ describe("CategorySelect", () => {
     expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it("cancels back to the dropdown", async () => {
+  it("clears the selection while the new-category form is open, so the old one cannot be saved", async () => {
+    const { user, onChange } = setup({ value: "3" });
+
+    await user.selectOptions(select(), "+ New category");
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("cancels back to the dropdown and restores the previous selection", async () => {
     const { user, onChange } = setup({ value: "3" });
 
     await user.selectOptions(select(), "+ New category");
@@ -144,7 +165,69 @@ describe("CategorySelect", () => {
 
     expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
     expect(select()).toHaveDisplayValue("Dine out");
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenNthCalledWith(1, "");
+    expect(onChange).toHaveBeenNthCalledWith(2, "3");
+  });
+
+  it("does not start a second creation while one is pending", async () => {
+    const pending = deferred<CategoryDTO>();
+    const onCreate = vi.fn().mockReturnValue(pending.promise);
+    const { user } = setup({ onCreate });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts{Enter}{Enter}{Enter}");
+
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Add category" })).toBeDisabled();
+  });
+
+  it("leaves the person's later choice alone when a slow creation finishes after they picked another category", async () => {
+    const pending = deferred<CategoryDTO>();
+    const { user, onChange } = setup({ onCreate: vi.fn().mockReturnValue(pending.promise) });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+    await user.selectOptions(select(), "Groceries");
+    expect(onChange).toHaveBeenLastCalledWith("1");
+
+    await act(async () => pending.resolve(makeCategory({ id: 99, name: "Gifts" })));
+
+    expect(onChange).not.toHaveBeenCalledWith("99");
+    expect(onChange).toHaveBeenLastCalledWith("1");
+    expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
+  });
+
+  it("does not select a slow creation's result after the person cancelled", async () => {
+    const pending = deferred<CategoryDTO>();
+    const { user, onChange } = setup({
+      value: "3",
+      onCreate: vi.fn().mockReturnValue(pending.promise),
+    });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await act(async () => pending.resolve(makeCategory({ id: 99, name: "Gifts" })));
+
+    expect(onChange).not.toHaveBeenCalledWith("99");
+    expect(onChange).toHaveBeenLastCalledWith("3");
+  });
+
+  it("ignores a slow failure after the person cancelled", async () => {
+    const pending = deferred<CategoryDTO>();
+    const { user } = setup({ onCreate: vi.fn().mockReturnValue(pending.promise) });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await act(async () => pending.reject(new Error("late failure")));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("switches back to a normal choice after opening the new-category form", async () => {

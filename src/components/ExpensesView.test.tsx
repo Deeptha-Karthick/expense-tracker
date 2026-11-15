@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ExpensesView } from "@/components/ExpensesView";
 import {
@@ -147,8 +147,13 @@ describe("ExpensesView detail modal", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("edits an expense and refreshes the list", async () => {
+  it("edits an expense and shows the change in the list", async () => {
     const user = await renderLoaded();
+    // What the server returns after the update.
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      range: RANGE,
+      expenses: [{ ...lunch, purpose: "Team lunch" }, taxi],
+    });
 
     await user.click(screen.getByRole("button", { name: /Lunch/ }));
     await user.click(screen.getByRole("button", { name: "Edit" }));
@@ -156,17 +161,22 @@ describe("ExpensesView detail modal", () => {
     await user.type(screen.getByLabelText(/Purpose/), "Team lunch");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-    await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("button", { name: /Team lunch/ })).toHaveTextContent("₹250.50");
+    expect(screen.queryByText("Lunch")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Taxi/ })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(updateExpense).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ purpose: "Team lunch", amountPaise: 25050, categoryId: 3 }),
     );
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(fetchExpenses).toHaveBeenCalledTimes(2);
   });
 
-  it("opens straight in edit mode from a row's edit icon and saves", async () => {
+  it("opens straight in edit mode from a row's edit icon and shows the saved change", async () => {
     const user = await renderLoaded();
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      range: RANGE,
+      expenses: [lunch, { ...taxi, purpose: "Cab", amountPaise: 20050 }],
+    });
 
     await user.click(screen.getAllByRole("button", { name: "Edit expense" })[1]);
 
@@ -176,24 +186,33 @@ describe("ExpensesView detail modal", () => {
 
     await user.clear(within(dialog).getByLabelText(/Purpose/));
     await user.type(within(dialog).getByLabelText(/Purpose/), "Cab");
+    await user.clear(within(dialog).getByLabelText(/Amount/));
+    await user.type(within(dialog).getByLabelText(/Amount/), "200.50");
     await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
 
-    await waitFor(() => expect(updateExpense).toHaveBeenCalledTimes(1));
-    expect(updateExpense).toHaveBeenCalledWith(2, expect.objectContaining({ purpose: "Cab" }));
+    expect(await screen.findByRole("button", { name: /Cab/ })).toHaveTextContent("₹200.50");
+    expect(screen.queryByText("Taxi")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(updateExpense).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ purpose: "Cab", amountPaise: 20050 }),
+    );
   });
 
-  it("deletes only after confirmation, then refreshes the list", async () => {
+  it("deletes only after confirmation, then removes the row from the list", async () => {
     const user = await renderLoaded();
+    vi.mocked(fetchExpenses).mockResolvedValue({ range: RANGE, expenses: [taxi] });
 
     await user.click(screen.getByRole("button", { name: /Lunch/ }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(deleteExpense).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Lunch/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Yes, delete" }));
 
-    await waitFor(() => expect(deleteExpense).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Lunch/ })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /Taxi/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(fetchExpenses).toHaveBeenCalledTimes(2);
+    expect(deleteExpense).toHaveBeenCalledWith(1);
   });
 
   it("keeps the dialog open and explains when saving fails", async () => {
@@ -217,8 +236,17 @@ describe("ExpensesView add expense", () => {
     return screen.getByRole("dialog", { name: "Add expense" });
   }
 
-  it("adds an expense with the amount converted to paise, then refreshes the list", async () => {
+  it("adds an expense with the amount converted to paise and shows it in the list", async () => {
     const user = await renderLoaded();
+    const created = makeExpense({
+      id: 3,
+      date: todayInKolkata(),
+      purpose: "Groceries run",
+      amountPaise: 125075,
+      categoryId: 1,
+      categoryName: "Groceries",
+    });
+    vi.mocked(fetchExpenses).mockResolvedValue({ range: RANGE, expenses: [created, lunch, taxi] });
     const dialog = await openAdd(user);
 
     expect(within(dialog).getByLabelText(/^Date/)).toHaveValue(todayInKolkata());
@@ -237,8 +265,37 @@ describe("ExpensesView add expense", () => {
       paymentMethod: null,
       notes: null,
     });
+    const row = await screen.findByRole("button", { name: /Groceries run/ });
+    expect(row).toHaveTextContent("₹1,250.75");
+    expect(row).toHaveTextContent("Groceries");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(fetchExpenses).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not close a newer dialog, or lose its draft, when an older save finishes", async () => {
+    let finishSave: () => void = () => {};
+    vi.mocked(createExpense).mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSave = resolve;
+      }),
+    );
+    const user = await renderLoaded();
+
+    // Start a save that stays pending, then dismiss that dialog.
+    const first = await openAdd(user);
+    await user.type(within(first).getByLabelText(/Purpose/), "Slow save");
+    await user.type(within(first).getByLabelText(/Amount/), "10");
+    await user.selectOptions(within(first).getByLabelText(/^Category/), "Groceries");
+    await user.click(within(first).getByRole("button", { name: "Add expense" }));
+    await user.click(within(first).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // Open a new dialog and start a draft before the first save finishes.
+    const second = await openAdd(user);
+    await user.type(within(second).getByLabelText(/Purpose/), "My draft");
+    await act(async () => finishSave());
+
+    const stillOpen = screen.getByRole("dialog", { name: "Add expense" });
+    expect(within(stillOpen).getByLabelText(/Purpose/)).toHaveValue("My draft");
   });
 
   it("creates a new category inline and uses it for the expense", async () => {

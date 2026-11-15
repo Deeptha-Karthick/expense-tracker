@@ -48,6 +48,23 @@ describe("ExpenseDialog", () => {
     expect(screen.getByLabelText(/^Category/)).toHaveDisplayValue("Dine out");
   });
 
+  it("moves focus to the first form field when Edit opens the form", async () => {
+    const { user } = setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByLabelText(/^Date/)).toHaveFocus();
+  });
+
+  it("moves focus back to the Edit button when the form is cancelled", async () => {
+    const { user } = setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveFocus();
+  });
+
   it("saves edits through onUpdate", async () => {
     const { user, onUpdate } = setup();
 

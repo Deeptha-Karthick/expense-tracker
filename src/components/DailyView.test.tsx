@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { DailyView } from "@/components/DailyView";
 import { fetchCategories, fetchExpenses } from "@/lib/api-client";
 import { addDays, todayInKolkata } from "@/lib/dates";
+import { formatDisplayDate } from "@/lib/format";
 import { CATEGORIES, makeExpense, RANGE } from "@/test/fixtures";
 
 vi.mock("@/lib/api-client", async (importOriginal) => ({
@@ -35,11 +36,15 @@ describe("DailyView", () => {
       "Pets",
       "Total",
     ]);
-    expect(within(table).getAllByRole("row")).toHaveLength(32);
-    expect(vi.mocked(fetchExpenses).mock.calls[0][0]).toEqual({
-      from: addDays(today, -29),
-      to: today,
-    });
+
+    // 30 days: today first, 29 days ago last (the bottom row is the totals row).
+    const days = within(table)
+      .getAllByRole("rowheader")
+      .map((header) => header.textContent)
+      .filter((text) => text !== "Total");
+    expect(days).toHaveLength(30);
+    expect(days[0]).toBe(formatDisplayDate(today));
+    expect(days[29]).toBe(formatDisplayDate(addDays(today, -29)));
   });
 
   it("puts today's expense in today's row and totals it", async () => {
@@ -80,11 +85,14 @@ describe("DailyView", () => {
   });
 
   it("keeps loading until both the expenses and the categories have arrived", async () => {
-    vi.mocked(fetchCategories).mockReturnValue(new Promise(() => {}));
-    vi.mocked(fetchExpenses).mockResolvedValue({ range: RANGE, expenses: [] });
+    let resolveExpenses: (value: { range: typeof RANGE; expenses: [] }) => void = () => {};
+    vi.mocked(fetchCategories).mockReturnValue(new Promise(() => {})); // never arrives
+    vi.mocked(fetchExpenses).mockReturnValue(new Promise((resolve) => (resolveExpenses = resolve)));
     render(<DailyView />);
 
-    await vi.waitFor(() => expect(fetchExpenses).toHaveBeenCalled());
+    // The expenses have arrived; the categories have not.
+    await act(async () => resolveExpenses({ range: RANGE, expenses: [] }));
+
     expect(screen.getByText("Loading daily view…")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });

@@ -24,8 +24,13 @@ describe("StateMessage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Failed");
   });
 
-  it("omits the description when there is none", () => {
-    render(<StateMessage title="Only a title" />);
-    expect(screen.getByRole("status").querySelectorAll("p")).toHaveLength(1);
+  it("drops the description when it is removed", () => {
+    const { rerender } = render(<StateMessage title="Nothing here" description="Add something" />);
+    expect(screen.getByText("Add something")).toBeInTheDocument();
+
+    rerender(<StateMessage title="Nothing here" />);
+
+    expect(screen.queryByText("Add something")).not.toBeInTheDocument();
+    expect(screen.getByText("Nothing here")).toBeInTheDocument();
   });
 });

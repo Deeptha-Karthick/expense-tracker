@@ -78,16 +78,69 @@ describe("useCategories", () => {
     expect(result.current.categories).toEqual(CATEGORIES);
   });
 
-  it("addCategory before the list has loaded does not invent a list", async () => {
-    vi.mocked(fetchCategories).mockReturnValue(new Promise(() => {}));
-    vi.mocked(createCategory).mockResolvedValue(makeCategory({ id: 14 }));
+  it("keeps a category created before the initial fetch returns", async () => {
+    let resolveFetch: (value: typeof CATEGORIES) => void = () => {};
+    vi.mocked(fetchCategories).mockReturnValue(new Promise((resolve) => (resolveFetch = resolve)));
+    const gifts = makeCategory({ id: 14, name: "Gifts", isDefault: false });
+    vi.mocked(createCategory).mockResolvedValue(gifts);
     const { result } = renderHook(() => useCategories());
 
     await act(async () => {
       await result.current.addCategory("Gifts");
     });
-
     expect(result.current.status).toBe("loading");
-    expect(result.current.categories).toEqual([]);
+    expect(result.current.categories).toEqual([gifts]);
+
+    // The fetch started earlier, so it does not include the new category.
+    await act(async () => resolveFetch(CATEGORIES));
+
+    expect(result.current.status).toBe("success");
+    expect(result.current.categories).toEqual([...CATEGORIES, gifts]);
+  });
+
+  it("does not duplicate a created category the fetch already returned", async () => {
+    let resolveFetch: (value: typeof CATEGORIES) => void = () => {};
+    vi.mocked(fetchCategories).mockReturnValue(new Promise((resolve) => (resolveFetch = resolve)));
+    const pets = CATEGORIES[2];
+    vi.mocked(createCategory).mockResolvedValue(pets);
+    const { result } = renderHook(() => useCategories());
+
+    await act(async () => {
+      await result.current.addCategory("Pets");
+    });
+    await act(async () => resolveFetch(CATEGORIES));
+
+    expect(result.current.categories.filter((category) => category.id === pets.id)).toHaveLength(1);
+    expect(result.current.categories).toHaveLength(CATEGORIES.length);
+  });
+
+  it("does not add the same created category twice", async () => {
+    vi.mocked(fetchCategories).mockResolvedValue(CATEGORIES);
+    const gifts = makeCategory({ id: 14, name: "Gifts", isDefault: false });
+    vi.mocked(createCategory).mockResolvedValue(gifts);
+    const { result } = renderHook(() => useCategories());
+    await waitFor(() => expect(result.current.status).toBe("success"));
+
+    await act(async () => {
+      await result.current.addCategory("Gifts");
+      await result.current.addCategory("Gifts");
+    });
+
+    expect(result.current.categories.filter((category) => category.id === 14)).toHaveLength(1);
+  });
+
+  it("keeps a created category even when the initial fetch failed", async () => {
+    vi.mocked(fetchCategories).mockRejectedValue(new Error("down"));
+    const gifts = makeCategory({ id: 14, name: "Gifts", isDefault: false });
+    vi.mocked(createCategory).mockResolvedValue(gifts);
+    const { result } = renderHook(() => useCategories());
+    await waitFor(() => expect(result.current.status).toBe("error"));
+
+    await act(async () => {
+      await result.current.addCategory("Gifts");
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.categories).toEqual([gifts]);
   });
 });

@@ -4,8 +4,18 @@ import type { Summary } from "@/lib/summary";
 
 type Props = { summary: Summary };
 
-/** The accessible source of truth for the donut: names, amounts and shares as text. */
+/** The accessible source of truth for the bar chart: names, amounts and shares as text. */
 export function SummaryTable({ summary }: Props) {
+  // Everything shown is prepared here so the markup below only renders it.
+  const rows = summary.byCategory.map((row) => ({
+    id: row.categoryId,
+    name: row.name,
+    color: categoryColor(row.categoryId),
+    amount: formatINR(row.totalPaise),
+    share: formatPercent(row.percentage),
+  }));
+  const total = formatINR(summary.totalPaise);
+
   return (
     <table className="w-full text-sm">
       <caption className="sr-only">Spending by category</caption>
@@ -17,27 +27,27 @@ export function SummaryTable({ summary }: Props) {
         </tr>
       </thead>
       <tbody>
-        {summary.byCategory.map((row) => (
-          <tr key={row.categoryId} className="border-b border-black/10 dark:border-white/10">
+        {rows.map((row) => (
+          <tr key={row.id} className="border-b border-black/10 dark:border-white/10">
             <th scope="row" className="py-2 text-left font-normal">
               <span className="inline-flex items-center gap-2">
                 <span
                   aria-hidden="true"
                   className="size-3 rounded-sm"
-                  style={{ backgroundColor: categoryColor(row.categoryId) }}
+                  style={{ backgroundColor: row.color }}
                 />
                 {row.name}
               </span>
             </th>
-            <td className="py-2 text-right tabular-nums">{formatINR(row.totalPaise)}</td>
-            <td className="py-2 text-right tabular-nums">{formatPercent(row.percentage)}</td>
+            <td className="py-2 text-right tabular-nums">{row.amount}</td>
+            <td className="py-2 text-right tabular-nums">{row.share}</td>
           </tr>
         ))}
       </tbody>
       <tfoot>
         <tr className="font-medium">
           <th scope="row" className="py-2 text-left">Total</th>
-          <td className="py-2 text-right tabular-nums">{formatINR(summary.totalPaise)}</td>
+          <td className="py-2 text-right tabular-nums">{total}</td>
           <td className="py-2 text-right tabular-nums">100%</td>
         </tr>
       </tfoot>

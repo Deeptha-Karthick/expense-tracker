@@ -48,6 +48,7 @@ export function TextField({
           rows={3}
           aria-invalid={Boolean(error)}
           aria-describedby={describedBy}
+          aria-required={required}
           className={INPUT_CLASS}
         />
       ) : (

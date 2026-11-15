@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { getErrorMessage, type CategoryDTO } from "@/lib/api-client";
 import { categoryCreateSchema } from "@/lib/schemas";
 
@@ -17,47 +17,69 @@ const NEW_CATEGORY = "__new__";
 const CONTROL_CLASS =
   "w-full rounded-md border border-black/20 bg-transparent px-3 py-2 text-sm aria-[invalid=true]:border-red-700 dark:border-white/25 dark:aria-[invalid=true]:border-red-400";
 
-/** Category dropdown with a "+ New category" option that creates and selects one inline. */
+/**
+ * Category dropdown with a "+ New category" option that creates and selects one inline.
+ * While the new-category form is open the selection is cleared, so the expense cannot
+ * be saved with the previous category by mistake; Cancel restores it.
+ */
 export function CategorySelect({ id, categories, value, onChange, onCreate, error }: Props) {
   const [creating, setCreating] = useState(false);
+  const [previousValue, setPreviousValue] = useState("");
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState<string>();
+  // Bumped whenever the person moves on, so a slow creation can tell it is out of date.
+  const attempt = useRef(0);
 
   const selectValue = creating ? NEW_CATEGORY : value;
   const errorId = `${id}-error`;
 
+  function stopCreating() {
+    attempt.current += 1;
+    setCreating(false);
+    setName("");
+    setSaving(false);
+    setCreateError(undefined);
+  }
+
   function handleSelect(next: string) {
     if (next === NEW_CATEGORY) {
+      if (creating) return;
+      setPreviousValue(value);
       setCreating(true);
+      onChange("");
       return;
     }
-    setCreating(false);
+    stopCreating();
     onChange(next);
   }
 
   function cancelCreate() {
-    setCreating(false);
-    setName("");
-    setCreateError(undefined);
+    stopCreating();
+    onChange(previousValue);
   }
 
   async function addCategory() {
+    if (saving) return;
+
     const parsed = categoryCreateSchema.safeParse({ name });
     if (!parsed.success) {
       setCreateError("Enter a name (1 to 40 characters)");
       return;
     }
 
+    const current = ++attempt.current;
     setSaving(true);
     setCreateError(undefined);
     try {
       const created = await onCreate(parsed.data.name);
+      // The person cancelled or picked another category meanwhile: leave their choice alone.
+      if (attempt.current !== current) return;
       onChange(String(created.id));
-      cancelCreate();
+      stopCreating();
     } catch (caught) {
+      if (attempt.current !== current) return;
       setCreateError(getErrorMessage(caught, "Could not create the category."));
-    } finally {
       setSaving(false);
     }
   }

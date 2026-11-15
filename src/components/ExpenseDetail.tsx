@@ -18,6 +18,12 @@ export function ExpenseDetail({ expense, onEdit, onDelete }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
 
+  const amount = formatINR(expense.amountPaise);
+  const date = formatDisplayDate(expense.date);
+  const merchant = expense.merchant ?? EMPTY;
+  const paymentMethod = expense.paymentMethod ?? EMPTY;
+  const notes = expense.notes ?? EMPTY;
+
   async function confirmDelete() {
     setDeleting(true);
     setError(undefined);
@@ -35,19 +41,19 @@ export function ExpenseDetail({ expense, onEdit, onDelete }: Props) {
         <dt className="text-zinc-600 dark:text-zinc-400">Purpose</dt>
         <dd className="font-medium">{expense.purpose}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Amount</dt>
-        <dd className="font-medium tabular-nums">{formatINR(expense.amountPaise)}</dd>
+        <dd className="font-medium tabular-nums">{amount}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Date</dt>
-        <dd>{formatDisplayDate(expense.date)}</dd>
+        <dd>{date}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Category</dt>
         <dd>
           <CategoryChip categoryId={expense.categoryId} name={expense.categoryName} />
         </dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Merchant</dt>
-        <dd>{expense.merchant ?? EMPTY}</dd>
+        <dd>{merchant}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Payment method</dt>
-        <dd>{expense.paymentMethod ?? EMPTY}</dd>
+        <dd>{paymentMethod}</dd>
         <dt className="text-zinc-600 dark:text-zinc-400">Notes</dt>
-        <dd className="whitespace-pre-wrap">{expense.notes ?? EMPTY}</dd>
+        <dd className="whitespace-pre-wrap">{notes}</dd>
       </dl>
 
       {error && (
@@ -83,6 +89,7 @@ export function ExpenseDetail({ expense, onEdit, onDelete }: Props) {
           <button
             type="button"
             onClick={onEdit}
+            data-initial-focus
             className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background"
           >
             Edit

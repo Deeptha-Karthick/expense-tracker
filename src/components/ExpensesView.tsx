@@ -29,6 +29,11 @@ export function ExpensesView() {
 
   const closeDialog = () => setDialog(null);
 
+  /** Closes `opened` only if it is still the open dialog, so a newer dialog and its draft survive. */
+  function closeIfCurrent(opened: OpenDialog) {
+    setDialog((current) => (current === opened ? null : current));
+  }
+
   function openAdd() {
     setDialog({ kind: "add", values: emptyFormValues(todayInKolkata()) });
   }
@@ -42,20 +47,23 @@ export function ExpensesView() {
   }
 
   async function handleCreate(data: ExpenseCreateInput) {
+    const opened = dialog;
     await createExpense(data);
-    closeDialog();
+    closeIfCurrent(opened);
     refresh();
   }
 
   async function handleUpdate(id: number, data: ExpenseCreateInput) {
+    const opened = dialog;
     await updateExpense(id, data);
-    closeDialog();
+    closeIfCurrent(opened);
     refresh();
   }
 
   async function handleDelete(id: number) {
+    const opened = dialog;
     await deleteExpense(id);
-    closeDialog();
+    closeIfCurrent(opened);
     refresh();
   }
 

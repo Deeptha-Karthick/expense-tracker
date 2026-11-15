@@ -43,6 +43,11 @@ describe("TextField", () => {
     expect(screen.getByLabelText(/Purpose/)).toBeRequired();
   });
 
+  it("marks a required multi-line field as required too", () => {
+    render(<TextField id="notes" label="Notes" value="" onChange={vi.fn()} multiline required />);
+    expect(screen.getByRole("textbox", { name: /Notes/ })).toBeRequired();
+  });
+
   it("can be a multi-line textarea", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

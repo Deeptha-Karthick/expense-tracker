@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExpenseDetail } from "@/components/ExpenseDetail";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { Modal } from "@/components/Modal";
@@ -22,6 +22,7 @@ type Props = {
 /**
  * One dialog for an existing expense: it starts as the detail view and switches to
  * the edit form in place, so focus stays inside and returns to the row on close.
+ * When the view switches, focus moves to the first form field, or back to Edit.
  */
 export function ExpenseDialog({
   expense,
@@ -33,25 +34,41 @@ export function ExpenseDialog({
   onCreateCategory,
 }: Props) {
   const [editing, setEditing] = useState(startEditing);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const shownEditing = useRef(editing);
+
+  const title = editing ? "Edit expense" : "Expense details";
+  const initialValues = valuesFromExpense(expense);
+
+  useEffect(() => {
+    // Only react to a switch between views, not to the first render (Modal handles that).
+    if (shownEditing.current === editing) return;
+    shownEditing.current = editing;
+
+    const selector = editing ? "input, select, textarea" : "[data-initial-focus]";
+    contentRef.current?.querySelector<HTMLElement>(selector)?.focus();
+  }, [editing]);
 
   return (
-    <Modal title={editing ? "Edit expense" : "Expense details"} onClose={onClose}>
-      {editing ? (
-        <ExpenseForm
-          initialValues={valuesFromExpense(expense)}
-          categories={categories}
-          submitLabel="Save changes"
-          onSubmit={onUpdate}
-          onCancel={() => setEditing(false)}
-          onCreateCategory={onCreateCategory}
-        />
-      ) : (
-        <ExpenseDetail
-          expense={expense}
-          onEdit={() => setEditing(true)}
-          onDelete={onDelete}
-        />
-      )}
+    <Modal title={title} onClose={onClose}>
+      <div ref={contentRef}>
+        {editing ? (
+          <ExpenseForm
+            initialValues={initialValues}
+            categories={categories}
+            submitLabel="Save changes"
+            onSubmit={onUpdate}
+            onCancel={() => setEditing(false)}
+            onCreateCategory={onCreateCategory}
+          />
+        ) : (
+          <ExpenseDetail
+            expense={expense}
+            onEdit={() => setEditing(true)}
+            onDelete={onDelete}
+          />
+        )}
+      </div>
     </Modal>
   );
 }
