@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: "Concise and factual. Format every finding as: Type (Bug/Suggestion/Nitpick) - Issue - Resolution - Severity dot (red/yellow/green)."
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!package-lock.json"
+    - "!.next/**"
+    - "!coverage/**"
+    - "!next-env.d.ts"
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Write every finding in exactly this format:
+        **<Bug | Suggestion | Nitpick>** — Issue: <what is wrong> — Resolution: <how to fix it> — Severity: <🔴 | 🟡 | 🟢>
+        Severity: 🔴 must fix before merge (bugs, money/data errors, security); 🟡 should fix; 🟢 optional (nitpicks default to 🟢).
+    - path: "src/components/**"
+      instructions: |
+        - Every component must have a co-located *.test.tsx file. Flag components without one.
+        - JS logic (calculations, data transforms, handlers with real logic, conditionals beyond simple rendering) must be written outside JSX: in variables/functions above the return, a custom hook, or src/lib. Flag inline logic inside JSX expressions.
+        - A component file must not exceed 300 lines. If it does, flag it as a Bug with severity 🟡 and tell the author to split it into smaller components.
+    - path: "**/*.test.{ts,tsx}"
+      instructions: "Review against .claude/skills/write-tests/SKILL.md: test behavior not implementation, query by role/label first, use userEvent, cover every branch (per-file 70% threshold)."
+    - path: "src/lib/**"
+      instructions: "Money must be stored and computed as integer paise, never floats. Each file needs a co-located test file."
+    - path: "src/app/**"
+      instructions: "Routes and layouts only. Business logic belongs in src/lib or src/components."
+  tools:
+    eslint:
+      enabled: true
+    gitleaks:
+      enabled: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - ".claude/skills/create-component/SKILL.md"
+      - ".claude/skills/write-tests/SKILL.md"
+
+chat:
+  auto_reply: false
