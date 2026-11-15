@@ -1,38 +1,45 @@
 {
-    "name": "expense-tracker",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev",
-        "build": "next build",
-        "start": "next start",
-        "lint": "eslint .",
-        "typecheck": "next typegen && tsc --noEmit",
-        "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
-    },
-    "dependencies": {
-        "next": "16.4.6",
-        "react": "19.3.0",
-        "react-dom": "19.3.0"
-    },
-    "devDependencies": {
-        "@tailwindcss/turbopack": "4.3.3",
-        "@testing-library/dom": "^10.4.2",
-        "@testing-library/jest-dom": "^7.0.1",
-        "@testing-library/react": "^16.3.3",
-        "@testing-library/user-event": "^14.6.10",
-        "@types/node": "^24.19.2",
-        "@types/react": "^19",
-        "@types/react-dom": "^19",
-        "@vitejs/plugin-react": "^6.3.0",
-        "@vitest/coverage-v8": "^5.1.0",
-        "eslint": "^9",
-        "eslint-config-next": "16.4.6",
-        "jsdom": "^31.0.1",
-        "tailwindcss": "4.3.3",
-        "typescript": "^5",
-        "vitest": "^5.1.0"
-    }
+    "name":  "expense-tracker",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "next dev",
+                    "build":  "next build",
+                    "start":  "next start",
+                    "lint":  "eslint .",
+                    "typecheck":  "next typegen \u0026\u0026 tsc --noEmit",
+                    "test":  "vitest run",
+                    "test:coverage":  "vitest run --coverage",
+                    "db:generate":  "drizzle-kit generate",
+                    "db:migrate":  "drizzle-kit migrate",
+                    "seed:categories":  "tsx --env-file-if-exists=.env.local scripts/seed-categories.ts",
+                    "seed:demo":  "tsx --env-file-if-exists=.env.local scripts/seed-demo.ts"
+                },
+    "dependencies":  {
+                         "@neondatabase/serverless":  "^1.2.1",
+                         "drizzle-orm":  "^0.45.4",
+                         "next":  "16.4.6",
+                         "react":  "19.3.0",
+                         "react-dom":  "19.3.0"
+                     },
+    "devDependencies":  {
+                            "@tailwindcss/turbopack":  "4.3.3",
+                            "@testing-library/dom":  "^10.4.2",
+                            "@testing-library/jest-dom":  "^7.0.1",
+                            "@testing-library/react":  "^16.3.3",
+                            "@testing-library/user-event":  "^14.6.10",
+                            "@types/node":  "^24.19.2",
+                            "@types/react":  "^19",
+                            "@types/react-dom":  "^19",
+                            "@vitejs/plugin-react":  "^6.3.0",
+                            "@vitest/coverage-v8":  "^5.1.0",
+                            "drizzle-kit":  "^0.31.11",
+                            "eslint":  "^9",
+                            "eslint-config-next":  "16.4.6",
+                            "jsdom":  "^31.0.1",
+                            "tailwindcss":  "4.3.3",
+                            "tsx":  "^4.23.15",
+                            "typescript":  "^5",
+                            "vitest":  "^5.1.0"
+                        }
 }
-

@@ -15,7 +15,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/components/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts"],
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/*.d.ts",
+        // Thin DB glue that needs a real database; logic lives in pure files.
+        "src/lib/db/**",
+        "src/lib/repositories/**",
+      ],
       reporter: ["text", "html", "lcov"],
       thresholds: {
         perFile: true,
