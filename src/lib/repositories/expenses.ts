@@ -1,5 +1,15 @@
-import { and, count, desc, eq, getTableColumns, gte, lte } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  getTableColumns,
+  gte,
+  lte,
+  sql,
+} from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
+import type { CategoryTotal } from "@/lib/summary";
 import {
   categories,
   expenses,
@@ -72,6 +82,27 @@ export async function insertExpenses(rows: NewExpense[]): Promise<number> {
     .values(rows)
     .returning({ id: expenses.id });
   return inserted.length;
+}
+
+/** Per-category totals and counts for the inclusive range; categories with no expenses are omitted. */
+export async function totalsByCategory(
+  from: string,
+  to: string,
+): Promise<CategoryTotal[]> {
+  const rows = await getDb()
+    .select({
+      categoryId: expenses.categoryId,
+      name: categories.name,
+      // sum() of integers is bigint, which the driver returns as a string.
+      totalPaise: sql<string>`sum(${expenses.amountPaise})`,
+      count: count(),
+    })
+    .from(expenses)
+    .innerJoin(categories, eq(expenses.categoryId, categories.id))
+    .where(and(gte(expenses.date, from), lte(expenses.date, to)))
+    .groupBy(expenses.categoryId, categories.name);
+
+  return rows.map((row) => ({ ...row, totalPaise: Number(row.totalPaise) }));
 }
 
 export async function countExpenses(): Promise<number> {
