@@ -1,0 +1,159 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { CategorySelect } from "@/components/CategorySelect";
+import { CATEGORIES, makeCategory } from "@/test/fixtures";
+
+function setup(props: Partial<React.ComponentProps<typeof CategorySelect>> = {}) {
+  const onChange = vi.fn();
+  const onCreate = vi
+    .fn()
+    .mockResolvedValue(makeCategory({ id: 99, name: "Gifts", isDefault: false }));
+  render(
+    <CategorySelect
+      id="category"
+      categories={CATEGORIES}
+      value=""
+      onChange={onChange}
+      onCreate={onCreate}
+      {...props}
+    />,
+  );
+  return { onChange, onCreate, user: userEvent.setup() };
+}
+
+const select = () => screen.getByRole("combobox", { name: /Category/ });
+
+describe("CategorySelect", () => {
+  it("lists the categories and a new-category option", () => {
+    setup();
+
+    expect(screen.getByRole("option", { name: "Groceries" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Pets" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "+ New category" })).toBeInTheDocument();
+  });
+
+  it("reports the chosen category", async () => {
+    const { user, onChange } = setup();
+
+    await user.selectOptions(select(), "Dine out");
+
+    expect(onChange).toHaveBeenCalledWith("3");
+  });
+
+  it("shows an error linked to the select", () => {
+    setup({ error: "Choose a category" });
+
+    expect(select()).toBeInvalid();
+    expect(select()).toHaveAccessibleDescription("Choose a category");
+  });
+
+  it("opens an inline form for a new category", async () => {
+    const { user } = setup();
+
+    await user.selectOptions(select(), "+ New category");
+
+    expect(screen.getByLabelText("New category name")).toBeInTheDocument();
+    expect(select()).toHaveDisplayValue("+ New category");
+  });
+
+  it("creates the category and selects it", async () => {
+    const { user, onChange, onCreate } = setup();
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "  Gifts ");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    expect(onCreate).toHaveBeenCalledWith("Gifts");
+    expect(onChange).toHaveBeenCalledWith("99");
+    expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
+  });
+
+  it("asks for a valid name before calling the API", async () => {
+    const { user, onCreate } = setup();
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "   ");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a name (1 to 40 characters)");
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it("shows the API error, such as a duplicate name, and keeps the form open", async () => {
+    const onCreate = vi
+      .fn()
+      .mockRejectedValue({ response: { data: { error: "Category already exists" } } });
+    const { user, onChange } = setup({ onCreate });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "groceries");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Category already exists");
+    expect(screen.getByLabelText("New category name")).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("uses a generic message when the API gives none", async () => {
+    const { user } = setup({ onCreate: vi.fn().mockRejectedValue(new Error("network")) });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts");
+    await user.click(screen.getByRole("button", { name: "Add category" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not create the category.");
+  });
+
+  it("adds the category on Enter without submitting the surrounding form", async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const onCreate = vi.fn().mockResolvedValue(makeCategory({ id: 99, name: "Gifts" }));
+    const user = userEvent.setup();
+    render(
+      <form onSubmit={onSubmit}>
+        <CategorySelect
+          id="category"
+          categories={CATEGORIES}
+          value=""
+          onChange={vi.fn()}
+          onCreate={onCreate}
+        />
+      </form>,
+    );
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "Gifts{Enter}");
+
+    expect(onCreate).toHaveBeenCalledWith("Gifts");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("ignores other keys in the name field", async () => {
+    const { user, onCreate } = setup();
+
+    await user.selectOptions(select(), "+ New category");
+    await user.type(screen.getByLabelText("New category name"), "abc");
+
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it("cancels back to the dropdown", async () => {
+    const { user, onChange } = setup({ value: "3" });
+
+    await user.selectOptions(select(), "+ New category");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
+    expect(select()).toHaveDisplayValue("Dine out");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("switches back to a normal choice after opening the new-category form", async () => {
+    const { user, onChange } = setup();
+
+    await user.selectOptions(select(), "+ New category");
+    await user.selectOptions(select(), "Groceries");
+
+    expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledWith("1");
+  });
+});

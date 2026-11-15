@@ -2,13 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Expense tracker built with Claude. Scaffolding only so far; no features yet.
+Expense tracker built with Claude. Pages: `/` (expense list with a hover edit icon, detail/edit modal, add form), `/daily` (last 30 days by category grid with day and category totals) and `/summary` (range toggle, bar chart plus table).
 
 ## Stack
 
 - Next.js 16 (App Router, `src/` layout, Turbopack), React 19, TypeScript, Tailwind v4
 - ESLint 9 (flat config)
 - Vitest 5 + React Testing Library + jest-dom, jsdom, v8 coverage
+- zod (shared validation), axios (client-side API calls), Recharts (summary bar chart)
 - Next.js 16 has breaking changes: read the relevant guide in `node_modules/next/dist/docs/` before writing Next code (see `AGENTS.md`).
 
 ## Commands
@@ -34,7 +35,9 @@ Expense tracker built with Claude. Scaffolding only so far; no features yet.
 - `drizzle/`: committed migrations; `drizzle.config.ts` loads `.env.local` if present
 - `scripts/`: seed scripts (run with `tsx`)
 - `src/lib/schemas.ts`: shared zod schemas
-- `src/test/`: Vitest setup (`setup.ts`)
+- `src/lib/hooks/`: data hooks (`useExpenses`, `useCategories`, `useSummary`); they live in `src/lib` so the coverage gate applies. `src/lib/api-client.ts` holds the axios calls and `getErrorMessage`.
+- `src/test/`: Vitest setup (`setup.ts`, includes a jsdom `<dialog>` polyfill) and shared `fixtures.ts`
+- UI conventions: amounts go through `formatINR(paise)` (`src/lib/format.ts`); rupee text input becomes paise only via `rupeesToPaise` (`src/lib/money.ts`, string math, never `x * 100`); category colors come from `categoryColor(id)` (`--cat-1..8` in `globals.css`, validated palette, stable per category id); "today" is read inside effects or handlers via `todayInKolkata()`, not during render (Cache Components prerendering).
 - `vitest.config.mts`: must stay `.mts`
 - `.env.local` is gitignored; don't read or edit it. `.env.example` lists the expected variables.
 
@@ -65,4 +68,5 @@ API contract: see [docs/api-contract.md](docs/api-contract.md). Read it before c
 - Money is stored as integer paise, never floats.
 - Every component needs a test file.
 - Coverage covers `src/components/**` and `src/lib/**` with a per-file 70% threshold (lines, branches, functions, statements). Keep logic out of `src/app/`.
+- Run Vitest from PowerShell (`npm test`), not Git Bash: under Git Bash every suite fails with "Vitest failed to find the current suite".
 - Write JSON files without a BOM (PowerShell 5.1 `Set-Content -Encoding utf8` adds one and breaks the build).
