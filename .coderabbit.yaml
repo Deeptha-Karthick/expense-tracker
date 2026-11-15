@@ -28,6 +28,8 @@ reviews:
         - Every component must have a co-located *.test.tsx file. Flag components without one.
         - JS logic (calculations, data transforms, handlers with real logic, conditionals beyond simple rendering) must be written outside JSX: in variables/functions above the return, a custom hook, or src/lib. Flag inline logic inside JSX expressions.
         - A component file must not exceed 300 lines. If it does, flag it as a Bug with severity 🟡 and tell the author to split it into smaller components.
+    - path: "**/*.test.{ts,tsx}"
+      instructions: "Review against .claude/skills/write-tests/SKILL.md: test behavior not implementation, query by role/label first, use userEvent, cover every branch (per-file 70% threshold)."
     - path: "src/lib/**"
       instructions: "Money must be stored and computed as integer paise, never floats. Each file needs a co-located test file."
     - path: "src/app/**"
@@ -37,6 +39,14 @@ reviews:
       enabled: true
     gitleaks:
       enabled: true
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - ".claude/skills/create-component/SKILL.md"
+      - ".claude/skills/write-tests/SKILL.md"
 
 chat:
   auto_reply: true
