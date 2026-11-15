@@ -79,6 +79,26 @@ describe("generateDemoExpenses", () => {
     expect(rows.every((row) => row.purpose === "Miscellaneous")).toBe(true);
   });
 
+  it.each(["constructor", "toString", "__proto__"])(
+    "treats inherited object keys like %s as a custom category",
+    (name) => {
+      const rows = generateDemoExpenses({
+        today: "2026-06-30",
+        days: 400,
+        seed: 1,
+        categories: [{ id: 99, name }],
+      });
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((row) => row.purpose === "Miscellaneous")).toBe(true);
+    },
+  );
+
+  it("generates amounts in whole-rupee steps, optionally plus 50 paise", () => {
+    for (const row of generateDemoExpenses(base)) {
+      expect([0, 50]).toContain(row.amountPaise % 100);
+    }
+  });
+
   it("returns nothing for zero days", () => {
     expect(generateDemoExpenses({ ...base, days: 0 })).toEqual([]);
   });

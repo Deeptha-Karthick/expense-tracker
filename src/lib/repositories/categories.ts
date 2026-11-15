@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { DEFAULT_CATEGORIES } from "@/lib/default-categories";
 import { getDb } from "@/lib/db/client";
 import { categories, type Category } from "@/lib/db/schema";
@@ -21,8 +21,11 @@ export async function createCategory(name: string): Promise<Category | undefined
   return row;
 }
 
+/** Default categories can never be deleted, even when unreferenced. */
 export async function deleteCategory(id: number): Promise<void> {
-  await getDb().delete(categories).where(eq(categories.id, id));
+  await getDb()
+    .delete(categories)
+    .where(and(eq(categories.id, id), eq(categories.isDefault, false)));
 }
 
 /** Idempotent: existing names (case-insensitive) are skipped. Returns rows inserted. */
