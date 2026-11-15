@@ -15,29 +15,36 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setup(props: Partial<React.ComponentProps<typeof CategorySelect>> = {}) {
+type SelectProps = React.ComponentProps<typeof CategorySelect>;
+
+// Like the real form: the selected value lives in state and follows every onChange call,
+// so tests can assert what the dropdown actually shows. `value` is the initial selection.
+function Harness({ value: initial, onChange, ...rest }: SelectProps) {
+  const [value, setValue] = useState(initial);
+
+  function handleChange(next: string) {
+    setValue(next);
+    onChange(next);
+  }
+
+  return <CategorySelect {...rest} value={value} onChange={handleChange} />;
+}
+
+function setup(props: Partial<SelectProps> = {}) {
   const onChange = vi.fn();
   const onCreate = vi
     .fn()
     .mockResolvedValue(makeCategory({ id: 99, name: "Gifts", isDefault: false }));
-  function ControlledCategorySelect() {
-    const [value, setValue] = useState(props.value ?? "");
-    return (
-      <CategorySelect
-        id="category"
-        categories={CATEGORIES}
-        onCreate={onCreate}
-        {...props}
-        value={value}
-        onChange={(nextValue) => {
-          setValue(nextValue);
-          onChange(nextValue);
-          props.onChange?.(nextValue);
-        }}
-      />
-    );
-  }
-  render(<ControlledCategorySelect />);
+  render(
+    <Harness
+      id="category"
+      categories={CATEGORIES}
+      value=""
+      onChange={onChange}
+      onCreate={onCreate}
+      {...props}
+    />,
+  );
   return { onChange, onCreate, user: userEvent.setup() };
 }
 
@@ -198,14 +205,14 @@ describe("CategorySelect", () => {
     await user.type(screen.getByLabelText("New category name"), "Gifts");
     await user.click(screen.getByRole("button", { name: "Add category" }));
     await user.selectOptions(select(), "Groceries");
-    expect(onChange).toHaveBeenLastCalledWith("1");
+    expect(select()).toHaveDisplayValue("Groceries");
 
     await act(async () => pending.resolve(makeCategory({ id: 99, name: "Gifts" })));
 
-    expect(onChange).not.toHaveBeenCalledWith("99");
-    expect(onChange).toHaveBeenLastCalledWith("1");
     expect(select()).toHaveDisplayValue("Groceries");
     expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalledWith("99");
+    expect(onChange).toHaveBeenLastCalledWith("1");
   });
 
   it("does not select a slow creation's result after the person cancelled", async () => {
@@ -219,12 +226,14 @@ describe("CategorySelect", () => {
     await user.type(screen.getByLabelText("New category name"), "Gifts");
     await user.click(screen.getByRole("button", { name: "Add category" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(select()).toHaveDisplayValue("Dine out");
 
     await act(async () => pending.resolve(makeCategory({ id: 99, name: "Gifts" })));
 
+    expect(select()).toHaveDisplayValue("Dine out");
+    expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalledWith("99");
     expect(onChange).toHaveBeenLastCalledWith("3");
-    expect(select()).toHaveDisplayValue("Dine out");
   });
 
   it("ignores a slow failure after the person cancelled", async () => {
