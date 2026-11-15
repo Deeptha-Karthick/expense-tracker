@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { CategorySelect } from "@/components/CategorySelect";
 import type { CategoryDTO } from "@/lib/api-client";
 import { CATEGORIES, makeCategory } from "@/test/fixtures";
@@ -19,16 +20,24 @@ function setup(props: Partial<React.ComponentProps<typeof CategorySelect>> = {})
   const onCreate = vi
     .fn()
     .mockResolvedValue(makeCategory({ id: 99, name: "Gifts", isDefault: false }));
-  render(
-    <CategorySelect
-      id="category"
-      categories={CATEGORIES}
-      value=""
-      onChange={onChange}
-      onCreate={onCreate}
-      {...props}
-    />,
-  );
+  function ControlledCategorySelect() {
+    const [value, setValue] = useState(props.value ?? "");
+    return (
+      <CategorySelect
+        id="category"
+        categories={CATEGORIES}
+        onCreate={onCreate}
+        {...props}
+        value={value}
+        onChange={(nextValue) => {
+          setValue(nextValue);
+          onChange(nextValue);
+          props.onChange?.(nextValue);
+        }}
+      />
+    );
+  }
+  render(<ControlledCategorySelect />);
   return { onChange, onCreate, user: userEvent.setup() };
 }
 
@@ -195,6 +204,7 @@ describe("CategorySelect", () => {
 
     expect(onChange).not.toHaveBeenCalledWith("99");
     expect(onChange).toHaveBeenLastCalledWith("1");
+    expect(select()).toHaveDisplayValue("Groceries");
     expect(screen.queryByLabelText("New category name")).not.toBeInTheDocument();
   });
 
@@ -214,6 +224,7 @@ describe("CategorySelect", () => {
 
     expect(onChange).not.toHaveBeenCalledWith("99");
     expect(onChange).toHaveBeenLastCalledWith("3");
+    expect(select()).toHaveDisplayValue("Dine out");
   });
 
   it("ignores a slow failure after the person cancelled", async () => {
