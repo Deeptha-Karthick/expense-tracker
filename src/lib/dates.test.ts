@@ -1,4 +1,18 @@
-import { addDays, todayInKolkata } from "@/lib/dates";
+import { addDays, isValidDateString, todayInKolkata } from "@/lib/dates";
+
+describe("isValidDateString", () => {
+  it("accepts real dates including leap days", () => {
+    expect(isValidDateString("2026-06-15")).toBe(true);
+    expect(isValidDateString("2028-02-29")).toBe(true);
+  });
+
+  it.each(["2026-02-30", "2027-02-29", "2026-13-01", "2026-00-10", "2026-6-5", "", "yesterday", "2026-06-15T00:00:00Z"])(
+    "rejects %j",
+    (value) => {
+      expect(isValidDateString(value)).toBe(false);
+    },
+  );
+});
 
 describe("todayInKolkata", () => {
   it("rolls to the next day once UTC passes 18:30", () => {
