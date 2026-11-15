@@ -94,7 +94,12 @@ describe("POST /api/expenses", () => {
     const response = await post(validBody);
 
     expect(response.status).toBe(201);
-    expect((await response.json()).id).toBe(1);
+    expect(await response.json()).toMatchObject({
+      id: 1,
+      amountPaise: 25050,
+      purpose: "Lunch",
+      categoryId: 3,
+    });
     expect(createExpense).toHaveBeenCalledWith(validBody);
   });
 

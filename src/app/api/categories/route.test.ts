@@ -54,6 +54,7 @@ describe("POST /api/categories", () => {
     const response = await post({ name: "  Pets  " });
 
     expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ id: 13, name: "Pets" });
     expect(createCategory).toHaveBeenCalledWith("Pets");
   });
 

@@ -74,6 +74,7 @@ describe("PATCH /api/expenses/:id", () => {
     const response = await patch("1", { purpose: "Dinner" });
 
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: 1, purpose: "Dinner" });
     expect(updateExpense).toHaveBeenCalledWith(1, { purpose: "Dinner" });
   });
 
